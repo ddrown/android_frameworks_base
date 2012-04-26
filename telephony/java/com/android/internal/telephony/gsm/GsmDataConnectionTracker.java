@@ -1906,6 +1906,8 @@ public final class GsmDataConnectionTracker extends DataConnectionTracker {
 
             // everything is setup
             if(TextUtils.equals(apnContext.getApnType(),Phone.APN_TYPE_DEFAULT)) {
+                LinkProperties apnLinkProperties = dcac.getLinkPropertiesSync();
+
                 SystemProperties.set("gsm.defaultpdpcontext.active", "true");
                 if (canSetPreferApn && mPreferredApn == null) {
                     if (DBG) log("onDataSetupComplete: PREFERED APN is null");
@@ -1914,6 +1916,14 @@ public final class GsmDataConnectionTracker extends DataConnectionTracker {
                         setPreferredApn(mPreferredApn.id);
                     }
                 }
+
+		SystemProperties.set("gsm.defaultpdpcontext.interface", apnLinkProperties.getInterfaceName());
+
+		if(apn.protocol.equals(RILConstants.SETUP_DATA_PROTOCOL_IPV6)) {
+		    SystemProperties.set("gsm.pdpprotocol.ipv6", "1");
+		} else {
+		    SystemProperties.set("gsm.pdpprotocol.ipv6", "0");
+		}
             } else {
                 SystemProperties.set("gsm.defaultpdpcontext.active", "false");
             }
@@ -2005,6 +2015,11 @@ public final class GsmDataConnectionTracker extends DataConnectionTracker {
         apnContext.setState(State.IDLE);
 
         mPhone.notifyDataConnection(apnContext.getReason(), apnContext.getApnType());
+
+	if(TextUtils.equals(apnContext.getApnType(),Phone.APN_TYPE_DEFAULT)) {
+	    SystemProperties.set("gsm.pdpprotocol.ipv6", "0");
+	    SystemProperties.set("gsm.defaultpdpcontext.interface", "");
+	}
 
         // if all data connection are gone, check whether Airplane mode request was
         // pending.

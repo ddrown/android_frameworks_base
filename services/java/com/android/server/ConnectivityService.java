@@ -1234,11 +1234,11 @@ private NetworkStateTracker makeWimaxStateTracker() {
     }
 
     private boolean addRoute(LinkProperties p, RouteInfo r, boolean toDefaultTable) {
-        return modifyRoute(p.getInterfaceName(), p, r, 0, ADD, toDefaultTable);
+        return modifyRoute(p, r, 0, ADD, toDefaultTable);
     }
 
     private boolean removeRoute(LinkProperties p, RouteInfo r, boolean toDefaultTable) {
-        return modifyRoute(p.getInterfaceName(), p, r, 0, REMOVE, toDefaultTable);
+        return modifyRoute(p, r, 0, REMOVE, toDefaultTable);
     }
 
     private boolean addRouteToAddress(LinkProperties lp, InetAddress addr) {
@@ -1264,17 +1264,27 @@ private NetworkStateTracker makeWimaxStateTracker() {
                 bestRoute = RouteInfo.makeHostRoute(addr, bestRoute.getGateway());
             }
         }
-        return modifyRoute(lp.getInterfaceName(), lp, bestRoute, 0, doAdd, toDefaultTable);
+        return modifyRoute(lp, bestRoute, 0, doAdd, toDefaultTable);
     }
 
-    private boolean modifyRoute(String ifaceName, LinkProperties lp, RouteInfo r, int cycleCount,
+    private boolean modifyRoute(LinkProperties lp, RouteInfo r, int cycleCount,
             boolean doAdd, boolean toDefaultTable) {
-        if ((ifaceName == null) || (lp == null) || (r == null)) return false;
+        if ((lp == null) || (r == null)) return false;
 
         if (cycleCount > MAX_HOSTROUTE_CYCLE_COUNT) {
             loge("Error modifying route - too much recursion");
             return false;
         }
+	String ifaceName;
+	if(r.getDestination().getAddress() instanceof Inet4Address) {
+	    ifaceName = lp.getIPv4InterfaceName();
+	} else {
+	    ifaceName = lp.getIPv6InterfaceName();
+	}
+	if(ifaceName == null) {
+	    loge("Error modifying route - no interface name");
+	    return false;
+	}
 
         if (r.isHostRoute() == false) {
             RouteInfo bestRoute = RouteInfo.selectBestRoute(lp.getRoutes(), r.getGateway());
@@ -1287,7 +1297,7 @@ private NetworkStateTracker makeWimaxStateTracker() {
                     // route to it's gateway
                     bestRoute = RouteInfo.makeHostRoute(r.getGateway(), bestRoute.getGateway());
                 }
-                modifyRoute(ifaceName, lp, bestRoute, cycleCount+1, doAdd, toDefaultTable);
+                modifyRoute(lp, bestRoute, cycleCount+1, doAdd, toDefaultTable);
             }
         }
         if (doAdd) {
