@@ -1321,7 +1321,7 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
                     try {
                         linkProperties = mConnService.getLinkProperties(upType);
                     } catch (RemoteException e) { }
-                    if (linkProperties != null) iface = linkProperties.getInterfaceName();
+                    if (linkProperties != null) iface = linkProperties.getIPv4InterfaceName();
                 }
                 notifyTetheredOfNewUpstreamIface(iface);
             }
