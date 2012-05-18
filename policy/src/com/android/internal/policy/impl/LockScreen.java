@@ -91,6 +91,7 @@ class LockScreen extends LinearLayout implements KeyguardScreen {
     private LockPatternUtils mLockPatternUtils;
     private KeyguardUpdateMonitor mUpdateMonitor;
     private KeyguardScreenCallback mCallback;
+    private SettingsObserver mSettingsObserver;
 
     // current configuration state of keyboard and display
     private int mKeyboardHidden;
@@ -937,9 +938,9 @@ class LockScreen extends LinearLayout implements KeyguardScreen {
         mCreationOrientation = configuration.orientation;
 
         mKeyboardHidden = configuration.hardKeyboardHidden;
-        
-        SettingsObserver settingsObserver = new SettingsObserver(new Handler());
-        settingsObserver.observe();
+
+        mSettingsObserver = new SettingsObserver(new Handler());
+        mSettingsObserver.observe();
 
         if (LockPatternKeyguardView.DEBUG_CONFIGURATION) {
             Log.v(TAG, "***** CREATING LOCK SCREEN", new RuntimeException());
@@ -1143,6 +1144,8 @@ class LockScreen extends LinearLayout implements KeyguardScreen {
     /** {@inheritDoc} */
     public void cleanUp() {
         mUpdateMonitor.removeCallback(this); // this must be first
+        mContext.getContentResolver().unregisterContentObserver(mSettingsObserver);
+        mSettingsObserver = null;
         mLockPatternUtils = null;
         mUpdateMonitor = null;
         mCallback = null;
