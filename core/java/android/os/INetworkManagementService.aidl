@@ -331,4 +331,14 @@ interface INetworkManagementService
      * Flush the DNS cache associated with the specified interface.
      */
     void flushInterfaceDnsCache(String iface);
+
+    /**
+     * start the clatd (464xlat) service
+     */
+    void startClatd(String interfaceName);
+
+    /**
+     * stop the clatd (464xlat) service
+     */
+    void stopClatd();
 }

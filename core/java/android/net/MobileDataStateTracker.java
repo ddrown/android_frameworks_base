@@ -41,6 +41,7 @@ import com.android.internal.telephony.DataConnectionTracker;
 import com.android.internal.telephony.ITelephony;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.TelephonyIntents;
+import com.android.internal.telephony.Nat464xlatService;
 import com.android.internal.util.AsyncChannel;
 
 import java.io.CharArrayWriter;
@@ -109,6 +110,7 @@ public class MobileDataStateTracker implements NetworkStateTracker {
         filter.addAction(TelephonyIntents.ACTION_ANY_DATA_CONNECTION_STATE_CHANGED);
         filter.addAction(TelephonyIntents.ACTION_DATA_CONNECTION_FAILED);
         filter.addAction(DataConnectionTracker.ACTION_DATA_CONNECTION_TRACKER_MESSENGER);
+        filter.addAction(Nat464xlatService.ACTION_NAT_464XLAT_STATE_CHANGED);
 
         mContext.registerReceiver(new MobileDataStateReceiver(), filter);
         mMobileDataState = Phone.DataState.DISCONNECTED;
@@ -286,6 +288,23 @@ public class MobileDataStateTracker implements NetworkStateTracker {
                 mMessenger = intent.getParcelableExtra(DataConnectionTracker.EXTRA_MESSENGER);
                 AsyncChannel ac = new AsyncChannel();
                 ac.connect(mContext, MobileDataStateTracker.this.mHandler, mMessenger);
+	    } else if (intent.getAction().
+		    equals(Nat464xlatService.ACTION_NAT_464XLAT_STATE_CHANGED)) {
+		String state = intent.getStringExtra(Nat464xlatService.DATA_STATE);
+		String iface = intent.getStringExtra(Nat464xlatService.DATA_UPSTREAM_INTERFACE);
+		String clat_iface = intent.getStringExtra(Nat464xlatService.DATA_CLAT_INTERFACE);
+
+		if(mLinkProperties == null) {
+		    return;
+		}
+
+		if(iface.equals(mLinkProperties.getInterfaceName())) {
+		    if(state.equals(Nat464xlatService.STATE_RUNNING)) {
+			mLinkProperties.setSecondaryIPv4InterfaceName(clat_iface);
+		    } else {
+			mLinkProperties.setSecondaryIPv4InterfaceName(null);
+		    }
+		}
             } else {
                 if (DBG) log("Broadcast received: ignore " + intent.getAction());
             }

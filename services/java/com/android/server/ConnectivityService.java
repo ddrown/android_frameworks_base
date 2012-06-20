@@ -77,6 +77,7 @@ import android.util.SparseIntArray;
 import com.android.internal.net.LegacyVpnInfo;
 import com.android.internal.net.VpnConfig;
 import com.android.internal.telephony.Phone;
+import com.android.internal.telephony.Nat464xlatService;
 import com.android.server.am.BatteryStatsService;
 import com.android.server.connectivity.Tethering;
 import com.android.server.connectivity.Vpn;
@@ -126,6 +127,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
     private boolean mTetheringConfigValid = false;
 
     private Vpn mVpn;
+
+    private Nat464xlatService mNat464xlatService;
 
     /** Lock around {@link #mUidRules} and {@link #mMeteredIfaces}. */
     private Object mRulesLock = new Object();
@@ -534,6 +537,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
                                  mTethering.getUpstreamIfaceTypes().length != 0);
 
         mVpn = new Vpn(mContext, new VpnCallback());
+
+	mNat464xlatService = new Nat464xlatService(mContext, nmService, this);
 
         try {
             nmService.registerObserver(mTethering);

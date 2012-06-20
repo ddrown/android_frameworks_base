@@ -123,6 +123,8 @@ public class DataCallState {
                 // set interface name
                 linkProperties.setInterfaceName(ifname);
 
+		linkProperties.setProtocolType(type);
+
                 // set link addresses
                 if (addresses != null && addresses.length > 0) {
                     for (String addr : addresses) {
