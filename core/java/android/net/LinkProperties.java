@@ -53,6 +53,7 @@ import java.util.Collections;
 public class LinkProperties implements Parcelable {
 
     String mIfaceName;
+    String mProtocolType;
     private String mSecondaryIfaceIPv4Name, mSecondaryIfaceIPv6Name;
     private Collection<LinkAddress> mLinkAddresses = new ArrayList<LinkAddress>();
     private Collection<InetAddress> mDnses = new ArrayList<InetAddress>();
@@ -82,6 +83,7 @@ public class LinkProperties implements Parcelable {
     public LinkProperties(LinkProperties source) {
         if (source != null) {
             mIfaceName = source.getInterfaceName();
+	    mProtocolType = source.getProtocolType();
 	    if(source.hasSecondaryIPv4Interface()) {
 		mSecondaryIfaceIPv4Name = source.getIPv4InterfaceName();
 	    }
@@ -105,27 +107,20 @@ public class LinkProperties implements Parcelable {
         return mIfaceName;
     }
 
+    public void setProtocolType(String type) {
+	mProtocolType = type;
+    }
+
+    public String getProtocolType() {
+	return mProtocolType;
+    }
+
     // secondary physical or logical interface carrying IPv4 traffic
     public void setSecondaryIPv4InterfaceName(String iface) {
 	mSecondaryIfaceIPv4Name = iface;
     }
 
-    // TODO: is there a better place for this?
-    // potential problem: wifi + clat
-    public boolean checkForClat() {
-	if(mSecondaryIfaceIPv4Name != null) {
-	    return mSecondaryIfaceIPv4Name.equals("clat");
-	}
-	String ipv4_compat = SystemProperties.get("net.ipv4.compat");
-	if(ipv4_compat != null && ipv4_compat.equals("clat")) {
-	    mSecondaryIfaceIPv4Name = "clat";
-	    return true;
-	}
-	return false;
-    }
-
     public String getIPv4InterfaceName() {
-	checkForClat();
 	if(mSecondaryIfaceIPv4Name == null) {
 	    return mIfaceName;
 	} else {
@@ -134,8 +129,7 @@ public class LinkProperties implements Parcelable {
     }
 
     public boolean hasSecondaryIPv4Interface() {
-	checkForClat();
-	return mSecondaryIfaceIPv4Name == null;
+	return mSecondaryIfaceIPv4Name != null;
     }
 
     // secondary physical or logical interface carrying IPv6 traffic
@@ -152,7 +146,7 @@ public class LinkProperties implements Parcelable {
     }
 
     public boolean hasSecondaryIPv6Interface() {
-	return mSecondaryIfaceIPv6Name == null;
+	return mSecondaryIfaceIPv6Name != null;
     }
 
     public Collection<InetAddress> getAddresses() {
@@ -195,6 +189,7 @@ public class LinkProperties implements Parcelable {
 
     public void clear() {
         mIfaceName = null;
+	mProtocolType = null;
 	mSecondaryIfaceIPv4Name = null;
 	mSecondaryIfaceIPv6Name = null;
         mLinkAddresses.clear();
@@ -221,6 +216,8 @@ public class LinkProperties implements Parcelable {
 	    ifaceName += "[v6: "+mSecondaryIfaceIPv6Name+"] ";
 	}
 
+	String protocolType = "Protocol: ["+mProtocolType+"] ";
+
         String linkAddresses = "LinkAddresses: [";
         for (LinkAddress addr : mLinkAddresses) linkAddresses += addr.toString() + ",";
         linkAddresses += "] ";
@@ -234,7 +231,7 @@ public class LinkProperties implements Parcelable {
         routes += "] ";
         String proxy = (mHttpProxy == null ? "" : "HttpProxy: " + mHttpProxy.toString() + " ");
 
-        return ifaceName + linkAddresses + routes + dns + proxy;
+        return ifaceName + protocolType + linkAddresses + routes + dns + proxy;
     }
 
     /**
@@ -426,6 +423,7 @@ public class LinkProperties implements Parcelable {
         return ((null == mIfaceName) ? 0 : mIfaceName.hashCode()
 		+ ((mSecondaryIfaceIPv4Name == null) ? 0 : mSecondaryIfaceIPv4Name.hashCode())
 		+ ((mSecondaryIfaceIPv6Name == null) ? 0 : mSecondaryIfaceIPv6Name.hashCode())
+		+ ((mProtocolType == null) ? 0 : mProtocolType.hashCode())
                 + mLinkAddresses.size() * 31
                 + mDnses.size() * 37
                 + mRoutes.size() * 41
@@ -440,6 +438,7 @@ public class LinkProperties implements Parcelable {
         dest.writeString(getInterfaceName());
 	dest.writeString(mSecondaryIfaceIPv4Name);
 	dest.writeString(mSecondaryIfaceIPv6Name);
+	dest.writeString(mProtocolType);
         dest.writeInt(mLinkAddresses.size());
         for(LinkAddress linkAddress : mLinkAddresses) {
             dest.writeParcelable(linkAddress, flags);
@@ -486,6 +485,10 @@ public class LinkProperties implements Parcelable {
 		String v6iface = in.readString();
 		if(v6iface != null) {
 		    netProp.setSecondaryIPv6InterfaceName(v6iface);
+		}
+		String protocolType = in.readString();
+		if(protocolType != null) {
+		    netProp.setProtocolType(protocolType);
 		}
                 int addressCount = in.readInt();
                 for (int i=0; i<addressCount; i++) {

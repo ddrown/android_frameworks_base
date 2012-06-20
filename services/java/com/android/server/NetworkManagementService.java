@@ -107,6 +107,7 @@ public class NetworkManagementService extends INetworkManagementService.Stub
         public static final int InterfaceTxThrottleResult = 219;
         public static final int QuotaCounterResult        = 220;
         public static final int TetheringStatsResult      = 221;
+	public static final int ClatdStatusResult         = 222;
 
         public static final int InterfaceChange           = 600;
         public static final int BandwidthControl          = 601;
@@ -1466,6 +1467,56 @@ public class NetworkManagementService extends INetworkManagementService.Stub
             throw new IllegalStateException(
                     "Error communicating with native daemon to flush interface " + iface, e);
         }
+    }
+
+    public void startClatd(String interfaceName) throws IllegalStateException {
+	mContext.enforceCallingOrSelfPermission(
+		android.Manifest.permission.CHANGE_NETWORK_STATE, "NetworkManagementService");
+
+	try {
+	    mConnector.doCommand("clatd start "+interfaceName);
+	} catch (NativeDaemonConnectorException e) {
+	    throw new IllegalStateException("Unable to communicate to native daemon: "+e.toString());
+	}
+    }
+
+    public void stopClatd() throws IllegalStateException {
+	mContext.enforceCallingOrSelfPermission(
+		android.Manifest.permission.CHANGE_NETWORK_STATE, "NetworkManagementService");
+
+	try {
+	    mConnector.doCommand("clatd stop");
+	} catch (NativeDaemonConnectorException e) {
+	    throw new IllegalStateException("Unable to communicate to native daemon: "+e.toString());
+	}
+    }
+
+    public boolean isClatdStarted() throws IllegalStateException {
+        mContext.enforceCallingOrSelfPermission(
+                android.Manifest.permission.ACCESS_NETWORK_STATE, "NetworkManagementService");
+
+        ArrayList<String> rsp;
+        try {
+            rsp = mConnector.doCommand("clatd status");
+        } catch (NativeDaemonConnectorException e) {
+            throw new IllegalStateException(
+                    "Unable to communicate to native daemon to get clatd status");
+        }
+
+        for (String line : rsp) {
+            String[] tok = line.split(" ");
+            if (tok.length < 3) {
+                throw new IllegalStateException("Malformed response for clatd status: " + line);
+            }
+            int code = Integer.parseInt(tok[0]);
+            if (code == NetdResponseCode.ClatdStatusResult) {
+                // Clatd status: <started/stopped>
+                return "started".equals(tok[2]);
+            } else {
+                throw new IllegalStateException(String.format("Unexpected response code %d", code));
+            }
+        }
+        throw new IllegalStateException("Got an empty response");
     }
 
     /** {@inheritDoc} */
