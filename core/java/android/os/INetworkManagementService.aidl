@@ -369,4 +369,14 @@ interface INetworkManagementService
     void setFirewallEgressSourceRule(String addr, boolean allow);
     void setFirewallEgressDestRule(String addr, int port, boolean allow);
     void setFirewallUidRule(int uid, boolean allow);
+
+    /**
+     * start the clatd (464xlat) service
+     */
+    void startClatd(String interfaceName);
+
+    /**
+     * stop the clatd (464xlat) service
+     */
+    void stopClatd();
 }

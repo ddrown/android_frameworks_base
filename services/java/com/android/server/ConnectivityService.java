@@ -98,6 +98,7 @@ import com.android.internal.net.VpnProfile;
 import com.android.internal.telephony.Phone;
 import com.android.internal.telephony.PhoneConstants;
 import com.android.internal.util.IndentingPrintWriter;
+import com.android.internal.telephony.Nat464xlatService;
 import com.android.server.am.BatteryStatsService;
 import com.android.server.connectivity.Tethering;
 import com.android.server.connectivity.Vpn;
@@ -156,6 +157,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 
     private boolean mLockdownEnabled;
     private LockdownVpnTracker mLockdownTracker;
+
+    private Nat464xlatService mNat464xlatService;
 
     /** Lock around {@link #mUidRules} and {@link #mMeteredIfaces}. */
     private Object mRulesLock = new Object();
@@ -538,6 +541,8 @@ public class ConnectivityService extends IConnectivityManager.Stub {
 
         mVpn = new Vpn(mContext, mVpnCallback, mNetd);
         mVpn.startMonitoring(mContext, mTrackerHandler);
+
+	mNat464xlatService = new Nat464xlatService(mContext, nmService, this);
 
         try {
             mNetd.registerObserver(mTethering);
