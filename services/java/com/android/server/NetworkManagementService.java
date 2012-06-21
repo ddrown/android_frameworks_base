@@ -108,6 +108,8 @@ public class NetworkManagementService extends INetworkManagementService.Stub
         public static final int QuotaCounterResult        = 220;
         public static final int TetheringStatsResult      = 221;
 	public static final int ClatdStatusResult         = 222;
+	public static final int IPv6FwdStatusResult       = 223;
+	public static final int V6TetherStatusResult      = 224;
 
         public static final int InterfaceChange           = 600;
         public static final int BandwidthControl          = 601;
@@ -1512,6 +1514,91 @@ public class NetworkManagementService extends INetworkManagementService.Stub
             if (code == NetdResponseCode.ClatdStatusResult) {
                 // Clatd status: <started/stopped>
                 return "started".equals(tok[2]);
+            } else {
+                throw new IllegalStateException(String.format("Unexpected response code %d", code));
+            }
+        }
+        throw new IllegalStateException("Got an empty response");
+    }
+
+    public boolean getIPv6ForwardingEnabled() throws IllegalStateException{
+        mContext.enforceCallingOrSelfPermission(
+                android.Manifest.permission.ACCESS_NETWORK_STATE, "NetworkManagementService");
+
+        ArrayList<String> rsp;
+        try {
+            rsp = mConnector.doCommand("ipv6fwd status");
+        } catch (NativeDaemonConnectorException e) {
+            throw new IllegalStateException(
+                    "Unable to communicate with native daemon to get ipv6fwd status");
+        }
+
+        for (String line : rsp) {
+            String[] tok = line.split(" ");
+            if (tok.length < 4) {
+                Slog.e(TAG, "Malformed response from native daemon: " + line);
+                return false;
+            }
+
+            int code = Integer.parseInt(tok[0]);
+            if (code == NetdResponseCode.IPv6FwdStatusResult) {
+                // 223 IPv6 Forwarding <enabled/disabled>
+                return "enabled".equals(tok[3]);
+            } else {
+                throw new IllegalStateException(String.format("Unexpected response code %d", code));
+            }
+        }
+        throw new IllegalStateException("Got an empty response");
+    }
+
+    public void setIPv6ForwardingEnabled(boolean enable) throws IllegalStateException {
+        mContext.enforceCallingOrSelfPermission(
+                android.Manifest.permission.CHANGE_NETWORK_STATE, "NetworkManagementService");
+        mConnector.doCommand(String.format("ipv6fwd %sable", (enable ? "en" : "dis")));
+    }
+
+    public void startIPv6Tethering(String downstreamIface, String address)
+	throws IllegalStateException {
+	mContext.enforceCallingOrSelfPermission(
+                android.Manifest.permission.CHANGE_NETWORK_STATE, "NetworkManagementService");
+        try {
+	    mConnector.doCommand("v6tether start "+downstreamIface+" "+address);
+        } catch (NativeDaemonConnectorException e) {
+            throw new IllegalStateException("Unable to communicate to native daemon");
+	}
+    }
+
+    public void stopIPv6Tethering() throws IllegalStateException {
+	mContext.enforceCallingOrSelfPermission(
+                android.Manifest.permission.CHANGE_NETWORK_STATE, "NetworkManagementService");
+        try {
+	    mConnector.doCommand("v6tether stop");
+        } catch (NativeDaemonConnectorException e) {
+            throw new IllegalStateException("Unable to communicate to native daemon");
+	}
+    }
+
+    public boolean isIPv6TetheringStarted() throws IllegalStateException {
+        mContext.enforceCallingOrSelfPermission(
+                android.Manifest.permission.ACCESS_NETWORK_STATE, "NetworkManagementService");
+
+        ArrayList<String> rsp;
+        try {
+            rsp = mConnector.doCommand("v6tether status");
+        } catch (NativeDaemonConnectorException e) {
+            throw new IllegalStateException(
+                    "Unable to communicate to native daemon to get v6tether status");
+        }
+
+        for (String line : rsp) {
+            String[] tok = line.split(" ");
+            if (tok.length < 4) {
+                throw new IllegalStateException("Malformed response for tether status: " + line);
+            }
+            int code = Integer.parseInt(tok[0]);
+            if (code == NetdResponseCode.V6TetherStatusResult) {
+                // 224 V6Tethering services <started/stopped>
+                return "started".equals(tok[3]);
             } else {
                 throw new IllegalStateException(String.format("Unexpected response code %d", code));
             }
