@@ -341,4 +341,29 @@ interface INetworkManagementService
      * stop the clatd (464xlat) service
      */
     void stopClatd();
+
+    /**
+     * get the IPv6 forwarding state
+     */
+    boolean getIPv6ForwardingEnabled();
+
+    /**
+     * set the IPv6 forwarding state
+     */
+    void setIPv6ForwardingEnabled(boolean enable);
+
+    /**
+     * start IPv6 tethering on an interface
+     */
+    void startIPv6Tethering(String downstreamIface, String address);
+
+    /**
+     * stop IPv6 tethering
+     */
+    void stopIPv6Tethering();
+
+    /**
+     * get the state of IPv6 tethering services
+     */
+    boolean isIPv6TetheringStarted();
 }
