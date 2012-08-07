@@ -1396,7 +1396,11 @@ public class NetworkManagementService extends INetworkManagementService.Stub
     public void setIPv6ForwardingEnabled(boolean enable) throws IllegalStateException {
         mContext.enforceCallingOrSelfPermission(
                 android.Manifest.permission.CHANGE_NETWORK_STATE, "NetworkManagementService");
-        mConnector.doCommand(String.format("ipv6fwd %sable", (enable ? "en" : "dis")));
+        try {
+            mConnector.doCommand(String.format("ipv6fwd %sable", (enable ? "en" : "dis")));
+        } catch (NativeDaemonConnectorException e) {
+            throw new IllegalStateException("Unable to communicate to native daemon");
+	}
     }
 
     public void startIPv6Tethering(String downstreamIface, String address)
