@@ -695,7 +695,7 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
         final ArrayList<String> list = Lists.newArrayList();
         synchronized (mPublicSync) {
             for (TetherInterfaceSM sm : mIfaces.values()) {
-                if (sm.isTethered()) {
+                if (sm.isTethered() && sm.mMyUpstreamInterfaces != null) {
                     list.add(sm.mMyUpstreamInterfaces.getUpstreamV4IfaceName());
                     list.add(sm.mIfaceName);
                 }
