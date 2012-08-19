@@ -1922,6 +1922,15 @@ public final class Settings {
         public static final String ACCELEROMETER_ROTATION = "accelerometer_rotation";
 
         /**
+         * Control whether the accelerometer will be used to change lockscreen
+         * orientation.  If 0, it will not be used unless explicitly requested
+         * by the application; if 1, it will be used by default unless explicitly
+         * disabled by the application.
+         * @hide
+         */
+        public static final String LOCKSCREEN_ROTATION = "lockscreen_rotation";
+
+        /**
          * Control the type of rotation which can be performed using the accelerometer
          * if ACCELEROMETER_ROTATION is enabled.
          * Value is a bitwise combination of
@@ -2217,6 +2226,12 @@ public final class Settings {
         public static final String LOCKSCREEN_DISABLED = "lockscreen.disabled";
 
         /**
+         * Whether the lockscreen vibrate should be enabled.
+         * @hide
+         */
+        public static final String LOCKSCREEN_VIBRATE_ENABLED = "lockscreen.vibrate_enabled";
+
+        /**
          * Stores values for custom lockscreen targets
          * @hide
          */
@@ -2358,6 +2373,7 @@ public final class Settings {
         public static final String WIDGET_BUTTONS_TABLET = "expanded_widget_buttons_tablet";
 
         /**
+
          * Navigation controls to Use
          *
          * @hide
@@ -2672,7 +2688,19 @@ public final class Settings {
          * Whether power menu screenshot is enabled
          * @hide
          */
+        public static final String POWER_MENU_REBOOT_ENABLED = "power_menu_reboot_enabled";
+
+        /**
+         * Whether power menu screenshot is enabled
+         * @hide
+         */
         public static final String POWER_MENU_SCREENSHOT_ENABLED = "power_menu_screenshot_enabled";
+
+        /**
+         * Whether power menu screenshot is enabled
+         * @hide
+         */
+        public static final String POWER_MENU_PROFILES_ENABLED = "power_menu_profiles_enabled";
 
         /**
          * Whether to enable custom rebindings of the actions performed on
@@ -2799,6 +2827,7 @@ public final class Settings {
             TIME_12_24,
             DATE_FORMAT,
             ACCELEROMETER_ROTATION,
+            LOCKSCREEN_ROTATION,
             USER_ROTATION,
             DTMF_TONE_WHEN_DIALING,
             DTMF_TONE_TYPE_WHEN_DIALING,
@@ -2829,6 +2858,9 @@ public final class Settings {
             LOCKSCREEN_ALWAYS_SHOW_BATTERY,
             SYSTEM_PROFILES_ENABLED,
             POWER_MENU_SCREENSHOT_ENABLED,
+            POWER_MENU_REBOOT_ENABLED,
+            POWER_MENU_PROFILES_ENABLED,
+            LOCKSCREEN_VIBRATE_ENABLED,
         };
 
         // Settings moved to Settings.Secure
@@ -3597,6 +3629,11 @@ public final class Settings {
          */
         public static final String ASSISTED_GPS_ENABLED = "assisted_gps_enabled";
 
+        /**
+         * External GPS source/device
+         * @hide
+         */
+        public static final String EXTERNAL_GPS_BT_DEVICE = "0";
         /**
          * The Logging ID (a unique 64-bit value) as a hex string.
          * Used as a pseudonymous identifier for logging.

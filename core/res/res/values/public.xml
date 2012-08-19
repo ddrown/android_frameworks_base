@@ -3815,6 +3815,7 @@
   <java-symbol type="string" name="weather_no_data" />
   <java-symbol type="string" name="weather_tap_to_refresh" />
   <java-symbol type="string" name="weather_refreshing" />
+  <java-symbol type="string" name="weather_last_sync_just_now" />
   <java-symbol type="id" name="weather_panel" />
   <java-symbol type="id" name="weather_city" />
   <java-symbol type="id" name="weather_condition" />
@@ -3895,5 +3896,23 @@
   <java-symbol type="string" name="symbol_picker_Y" />
   <java-symbol type="string" name="symbol_picker_z" />
   <java-symbol type="string" name="symbol_picker_Z" />
+
+<!-- ===============================================================
+     AVRCP 1.3 Meta Data Resources
+     =============================================================== -->
+  <eat-comment />
+
+  <java-symbol type="array" name="avrcp_meta_changed_intents" />
+  <java-symbol type="array" name="avrcp_playstate_changed_intents" />
+  <java-symbol type="array" name="avrcp_special_extra_keys" />
+  <java-symbol type="array" name="avrcp_overridable_extra_keys" />
+  <java-symbol type="string" name="com.amazon.mp3.metachanged_track" />
+  <java-symbol type="string" name="com.amazon.mp3.metachanged_artist" />
+  <java-symbol type="string" name="com.amazon.mp3.metachanged_album" />
+  <java-symbol type="string" name="com.amazon.mp3.metachanged_id" />
+  <java-symbol type="string" name="com.amazon.mp3.playstatechanged_track" />
+  <java-symbol type="string" name="com.amazon.mp3.playstatechanged_artist" />
+  <java-symbol type="string" name="com.amazon.mp3.playstatechanged_album" />
+  <java-symbol type="string" name="com.amazon.mp3.playstatechanged_id" />
 
 </resources>
