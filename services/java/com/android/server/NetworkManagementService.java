@@ -1384,7 +1384,7 @@ public class NetworkManagementService extends INetworkManagementService.Stub
 
             int code = Integer.parseInt(tok[0]);
             if (code == NetdResponseCode.IPv6FwdStatusResult) {
-                // 223 IPv6 Forwarding <enabled/disabled>
+                // {IPv6FwdStatusResult} IPv6 Forwarding <enabled/disabled>
                 return "enabled".equals(tok[3]);
             } else {
                 throw new IllegalStateException(String.format("Unexpected response code %d", code));
@@ -1399,7 +1399,7 @@ public class NetworkManagementService extends INetworkManagementService.Stub
         try {
             mConnector.doCommand(String.format("ipv6fwd %sable", (enable ? "en" : "dis")));
         } catch (NativeDaemonConnectorException e) {
-            throw new IllegalStateException("Unable to communicate to native daemon");
+            throw new IllegalStateException("Unable to communicate to native daemon: "+e.toString());
 	}
     }
 
@@ -1410,7 +1410,7 @@ public class NetworkManagementService extends INetworkManagementService.Stub
         try {
 	    mConnector.doCommand("v6tether start "+downstreamIface+" "+address);
         } catch (NativeDaemonConnectorException e) {
-            throw new IllegalStateException("Unable to communicate to native daemon");
+            throw new IllegalStateException("Unable to communicate to native daemon: "+e.toString());
 	}
     }
 
@@ -1420,7 +1420,7 @@ public class NetworkManagementService extends INetworkManagementService.Stub
         try {
 	    mConnector.doCommand("v6tether stop");
         } catch (NativeDaemonConnectorException e) {
-            throw new IllegalStateException("Unable to communicate to native daemon");
+            throw new IllegalStateException("Unable to communicate to native daemon: "+e.toString());
 	}
     }
 
