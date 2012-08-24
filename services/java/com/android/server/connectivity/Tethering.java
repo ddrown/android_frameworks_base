@@ -1072,6 +1072,7 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
 		    try {
 			if(mIfaceName == mIPv6TetheredInterface) {
 			    mNMService.stopIPv6Tethering();
+                            mNMService.disableIpv6(mIfaceName);
 			    mIPv6TetheredInterface = null;
 			}
 		    } catch (Exception e) {
@@ -1100,6 +1101,7 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
 			try {
 			    if(mIfaceName == mIPv6TetheredInterface) {
 				mNMService.stopIPv6Tethering();
+                                mNMService.disableIpv6(mIfaceName);
 				mIPv6TetheredInterface = null;
 			    }
 			} catch (Exception e) {
@@ -1145,6 +1147,7 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
 			    try {
 				String address = newUpstreamInterfaces.getUpstreamV6Address();
 				if(address != null && mIPv6TetheredInterface == null) {
+                                    mNMService.enableIpv6(mIfaceName);
 				    mNMService.startIPv6Tethering(mIfaceName,address);
 				    mIPv6TetheredInterface = mIfaceName;
 				}
@@ -1174,6 +1177,7 @@ public class Tethering extends INetworkManagementEventObserver.Stub {
 			try {
 			    if(mIfaceName == mIPv6TetheredInterface) {
 				mNMService.stopIPv6Tethering();
+                                mNMService.disableIpv6(mIfaceName);
 				mIPv6TetheredInterface = null;
 			    }
 			} catch (Exception e) {
