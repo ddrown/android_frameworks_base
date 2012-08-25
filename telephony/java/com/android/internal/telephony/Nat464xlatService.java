@@ -59,7 +59,7 @@ public class Nat464xlatService {
     public static String STATE_STOPPING = "stopping";
 
     private static final String TAG = "Nat464xlatService";
-    private static final String CLAT_INTERFACE_NAME = "clat";
+    private static final String CLAT_INTERFACE_NAME = "clat4";
 
     public Nat464xlatService(Context context, INetworkManagementService nmService, IConnectivityManager connService) {
         mContext = context;
