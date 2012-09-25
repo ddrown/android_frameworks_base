@@ -34,6 +34,7 @@ import libcore.util.MutableInt;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.res.Resources;
+import android.content.res.Configuration;
 import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationManager;
@@ -44,8 +45,12 @@ import android.text.TextUtils;
 import android.text.format.DateFormat;
 import android.text.format.DateUtils;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.ViewGroup;
+import android.view.ViewGroup.MarginLayoutParams;
+import android.provider.Settings;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -104,6 +109,7 @@ class KeyguardStatusViewManager implements OnClickListener {
     private TextView mStatus1View;
     private TextView mOwnerInfoView;
     private TextView mAlarmStatusView;
+    private LinearLayout mDateLineView;
     private TransportControlView mTransportView;
     private RelativeLayout mWeatherPanel, mWeatherTempsPanel;
     private TextView mWeatherCity, mWeatherCondition, mWeatherLowHigh, mWeatherTemp, mWeatherUpdateTime;
@@ -220,6 +226,7 @@ class KeyguardStatusViewManager implements OnClickListener {
         mStatus1View = (TextView) findViewById(R.id.status1);
         mAlarmStatusView = (TextView) findViewById(R.id.alarm_status);
         mOwnerInfoView = (TextView) findViewById(R.id.propertyOf);
+        mDateLineView = (LinearLayout) findViewById(R.id.date_line);
         mTransportView = (TransportControlView) findViewById(R.id.transport);
         mEmergencyCallButton = (Button) findViewById(R.id.emergencyCallButton);
         mEmergencyCallButtonEnabledInScreen = emergencyButtonEnabledInScreen;
@@ -272,6 +279,9 @@ class KeyguardStatusViewManager implements OnClickListener {
         updateOwnerInfo();
         refreshWeather();
         refreshCalendar();
+        if (mDigitalClock != null) {
+            updateClockAlign();
+        }
 
         // Required to get Marquee to work.
         final View scrollableViews[] = { mCarrierView, mDateView, mStatus1View, mOwnerInfoView,
@@ -290,6 +300,7 @@ class KeyguardStatusViewManager implements OnClickListener {
     private static WeatherInfo mWeatherInfo = new WeatherInfo();
     private static final int QUERY_WEATHER = 0;
     private static final int UPDATE_WEATHER = 1;
+    private boolean mWeatherRefreshing;
 
     private Handler mHandler = new Handler() {
         @Override
@@ -339,33 +350,34 @@ class KeyguardStatusViewManager implements OnClickListener {
                                 e.printStackTrace();
                             }
                         }
+                        if (DEBUG) {
+                            Log.d(TAG, "Location code is " + woeid);
+                        }
+                        WeatherInfo w = null;
+                        if (woeid != null) {
+                            try {
+                                w = parseXml(getDocument(woeid));
+                            } catch (Exception e) {
+                            }
+                        }
                         Message msg = Message.obtain();
                         msg.what = UPDATE_WEATHER;
-                        msg.obj = woeid;
+                        msg.obj = w;
                         mHandler.sendMessage(msg);
                     }
                 });
+                mWeatherRefreshing = true;
                 queryWeather.setPriority(Thread.MIN_PRIORITY);
                 queryWeather.start();
                 break;
             case UPDATE_WEATHER:
-                String woeid = (String) msg.obj;
-                if (woeid != null) {
-                    if (DEBUG) {
-                        Log.d(TAG, "Location code is " + woeid);
-                    }
-                    WeatherInfo w = null;
-                    try {
-                        w = parseXml(getDocument(woeid));
-                    } catch (Exception e) {
-                    }
-                    if (w == null) {
-                        setNoWeatherData();
-                    } else {
-                        setWeatherData(w);
-                        mWeatherInfo = w;
-                    }
+                WeatherInfo w = (WeatherInfo) msg.obj;
+                if (w != null) {
+                    mWeatherRefreshing = false;
+                    setWeatherData(w);
+                    mWeatherInfo = w;
                 } else {
+                    mWeatherRefreshing = false;
                     if (mWeatherInfo.temp.equals(WeatherInfo.NODATA)) {
                         setNoWeatherData();
                     } else {
@@ -389,7 +401,9 @@ class KeyguardStatusViewManager implements OnClickListener {
                     Settings.System.WEATHER_UPDATE_INTERVAL, 60); // Default to hourly
             boolean manualSync = (interval == 0);
             if (!manualSync && (((System.currentTimeMillis() - mWeatherInfo.last_sync) / 60000) >= interval)) {
-                mHandler.sendEmptyMessage(QUERY_WEATHER);
+                if (!mWeatherRefreshing) {
+                    mHandler.sendEmptyMessage(QUERY_WEATHER);
+                }
             } else if (manualSync && mWeatherInfo.last_sync == 0) {
                 setNoWeatherData();
             } else {
@@ -437,7 +451,7 @@ class KeyguardStatusViewManager implements OnClickListener {
                 mWeatherCity.setText(w.city);
                 mWeatherCity.setVisibility(showLocation ? View.VISIBLE : View.GONE);
             }
-            if (mWeatherCondition != null) {
+            if (mWeatherCondition != null && !mWeatherRefreshing) {
                 mWeatherCondition.setText(w.condition);
                 mWeatherCondition.setVisibility(View.VISIBLE);
             }
@@ -476,7 +490,7 @@ class KeyguardStatusViewManager implements OnClickListener {
                 mWeatherCity.setText(R.string.weather_no_data);
                 mWeatherCity.setVisibility(View.VISIBLE);
             }
-            if (mWeatherCondition != null) {
+            if (mWeatherCondition != null && !mWeatherRefreshing) {
                 mWeatherCondition.setText(R.string.weather_tap_to_refresh);
             }
             if (mWeatherUpdateTime != null) {
@@ -665,7 +679,9 @@ class KeyguardStatusViewManager implements OnClickListener {
         // First update the clock, if present.
         if (mDigitalClock != null) {
             mDigitalClock.updateTime();
+            updateClockAlign();
         }
+        refreshWeather();
 
         mUpdateMonitor.registerInfoCallback(mInfoCallback);
         mUpdateMonitor.registerSimStateCallback(mSimStateCallback);
@@ -723,6 +739,62 @@ class KeyguardStatusViewManager implements OnClickListener {
             mOwnerInfoView.setText(mOwnerInfoText);
             mOwnerInfoView.setVisibility(TextUtils.isEmpty(mOwnerInfoText) ? View.GONE:View.VISIBLE);
         }
+    }
+
+    private void updateClockAlign() {
+        final Configuration config = getContext().getResources().getConfiguration();
+        // No alignment on landscape.
+        if (config.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            return;
+        }
+
+        final int clockAlign = Settings.System.getInt(getContext().getContentResolver(),
+                Settings.System.LOCKSCREEN_CLOCK_ALIGN, 2);
+        int margin = (int) Math.round(getContext().getResources().getDimension(
+                R.dimen.keyguard_lockscreen_status_line_font_right_margin));
+
+        // Adjust for each layout
+        if (config.screenWidthDp >= 600) { // sw600dp
+            margin = 0;
+        }
+
+        int leftMargin = 0, rightMargin = 0;
+        int gravity = Gravity.RIGHT;
+
+        switch (clockAlign) {
+        case 0:
+            gravity = Gravity.LEFT;
+            leftMargin = margin;
+            break;
+        case 1:
+            gravity = Gravity.CENTER;
+            break;
+        case 2:
+            rightMargin = margin;
+            break;
+        }
+
+        mDigitalClock.setGravity(gravity);
+        setSpecificMargins(mDigitalClock, leftMargin, -1, rightMargin, -1);
+
+        if (mDateLineView != null) {
+            mDateLineView.setGravity(gravity);
+            setSpecificMargins(mDateLineView, leftMargin, -1, rightMargin, -1);
+        }
+        if (mStatus1View != null) {
+            mStatus1View.setGravity(gravity);
+            setSpecificMargins(mStatus1View, leftMargin, -1, rightMargin, -1);
+        }
+    }
+
+    private void setSpecificMargins(View view, int left, int top, int right,
+            int bottom) {
+        MarginLayoutParams params = (MarginLayoutParams) view.getLayoutParams();
+        if (left != -1) params.leftMargin = left;
+        if (top != -1) params.topMargin = top;
+        if (right != -1) params.rightMargin = right;
+        if (bottom != -1) params.bottomMargin = bottom;
+        view.setLayoutParams(params);
     }
 
     private void updateStatus1() {
@@ -1020,6 +1092,7 @@ class KeyguardStatusViewManager implements OnClickListener {
         @Override
         public void onTimeChanged() {
             refreshDate();
+            refreshWeather();
         }
 
         @Override
@@ -1054,7 +1127,7 @@ class KeyguardStatusViewManager implements OnClickListener {
             }
 
             mCallback.pokeWakelock();
-            if (!mHandler.hasMessages(QUERY_WEATHER)) {
+            if (!mWeatherRefreshing) {
                 mHandler.sendEmptyMessage(QUERY_WEATHER);
             }
         }

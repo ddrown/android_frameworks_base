@@ -269,6 +269,10 @@
     <!-- Boolean indicating whether Softap requires reloading AP firmware -->
     <bool name="config_wifiApFirmwareReload">true</bool>
 
+    <!-- Boolean indicating whether the start command should be called on the wireless interface
+         when starting the SoftAp -->
+    <bool name="config_wifiApStartInterface">false</bool>
+
     <!-- Boolean indicating whether the wifi chipset has dual frequency band support -->
     <bool translatable="false" name="config_wifi_dual_band_support">false</bool>
 
@@ -894,6 +898,9 @@
     <!-- Workaround for devices with broken keyboards -->
     <bool name="config_forceDisableHardwareKeyboard">false</bool>
 
+    <!-- Setting to false will disable CM's IME switcher implementation for tablets -->
+    <bool name="config_show_cmIMESwitcher">true</bool>
+
     <!-- Flag indicating whether we should enable automatic brightness for
          the button and keyboard backlights. -->
     <bool name="config_autoBrightnessButtonKeyboard">true</bool>
@@ -949,4 +956,9 @@
     <string-array translatable="false" name="config_accessoryDockNames">
         <item>"dock"</item>
     </string-array>
+
+    <!-- Maximum wallpaper width for devices with very high-res screen (1920x1200)
+         the wallpaper width suggestion by the launcher may be too large for
+         the GPU to handle. -->
+    <integer name="config_wallpaperMaxWidth">-1</integer>
 </resources>
