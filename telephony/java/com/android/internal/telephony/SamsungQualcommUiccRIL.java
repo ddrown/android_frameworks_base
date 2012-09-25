@@ -22,6 +22,7 @@ import android.content.Context;
 import android.os.Message;
 import android.os.Parcel;
 import android.os.SystemProperties;
+import android.os.SystemClock;
 import android.os.AsyncResult;
 import android.text.TextUtils;
 import android.util.Log;
@@ -40,9 +41,13 @@ public class SamsungQualcommUiccRIL extends QualcommSharedRIL implements Command
 
     public static final int INVALID_SNR = 0x7fffffff;
     private boolean mSignalbarCount = SystemProperties.getBoolean("ro.telephony.sends_barcount", false);
+    private Object mSMSLock = new Object();
+    private boolean mIsSendingSMS = false;
+    public static final long SEND_SMS_TIMEOUT_IN_MS = 30000;
 
     public SamsungQualcommUiccRIL(Context context, int networkMode, int cdmaSubscription) {
         super(context, networkMode, cdmaSubscription);
+        mQANElements = 4;
     }
 
     @Override
@@ -112,6 +117,33 @@ public class SamsungQualcommUiccRIL extends QualcommSharedRIL implements Command
 
     @Override
     public void
+    sendSMS (String smscPDU, String pdu, Message result) {
+        // Do not send a new SMS until the response for the previous SMS has been received
+        //   * for the error case where the response never comes back, time out after
+        //     30 seconds and just try the next SEND_SMS
+        synchronized (mSMSLock) {
+            long timeoutTime  = SystemClock.elapsedRealtime() + SEND_SMS_TIMEOUT_IN_MS;
+            long waitTimeLeft = SEND_SMS_TIMEOUT_IN_MS;
+            while (mIsSendingSMS && (waitTimeLeft > 0)) {
+                Log.d(LOG_TAG, "sendSMS() waiting for response of previous SEND_SMS");
+                try {
+                    mSMSLock.wait(waitTimeLeft);
+                } catch (InterruptedException ex) {
+                    // ignore the interrupt and rewait for the remainder
+                }
+                waitTimeLeft = timeoutTime - SystemClock.elapsedRealtime();
+            }
+            if (waitTimeLeft <= 0) {
+                Log.e(LOG_TAG, "sendSms() timed out waiting for response of previous CDMA_SEND_SMS");
+            }
+            mIsSendingSMS = true;
+        }
+
+        super.sendSMS(smscPDU, pdu, result);
+    }
+
+    @Override
+    public void
     setNetworkSelectionModeManual(String operatorNumeric, Message response) {
         RILRequest rr
                 = RILRequest.obtain(RIL_REQUEST_SET_NETWORK_SELECTION_MANUAL,
@@ -123,32 +155,6 @@ public class SamsungQualcommUiccRIL extends QualcommSharedRIL implements Command
         rr.mp.writeString(operatorNumeric);
 
         send(rr);
-    }
-
-    @Override
-    protected Object
-    responseOperatorInfos(Parcel p) {
-        String strings[] = (String [])responseStrings(p);
-        ArrayList<OperatorInfo> ret;
-
-        if (strings.length % 4 != 0) {
-            throw new RuntimeException(
-                "RIL_REQUEST_QUERY_AVAILABLE_NETWORKS: invalid response. Got "
-                + strings.length + " strings, expected multible of 4");
-        }
-
-        ret = new ArrayList<OperatorInfo>(strings.length / 4);
-
-        for (int i = 0 ; i < strings.length ; i += 4) {
-            ret.add (
-                new OperatorInfo(
-                    strings[i+0],
-                    strings[i+1],
-                    strings[i+2],
-                    strings[i+3]));
-        }
-
-        return ret;
     }
 
     @Override
@@ -305,5 +311,17 @@ public class SamsungQualcommUiccRIL extends QualcommSharedRIL implements Command
             " lteSignalStrength=" + response[7] + " lteRsrp=" + response[8] + " lteRsrq=" + response[9] +
             " lteRssnr=" + response[10] + " lteCqi=" + response[11]);
         return response;
+    }
+
+    @Override
+    protected Object
+    responseSMS(Parcel p) {
+        // Notify that sendSMS() can send the next SMS
+        synchronized (mSMSLock) {
+            mIsSendingSMS = false;
+            mSMSLock.notify();
+        }
+
+        return super.responseSMS(p);
     }
 }
