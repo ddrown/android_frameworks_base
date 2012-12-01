@@ -113,6 +113,8 @@ public class Nat464xlatService {
 
 	public void interfaceLinkStateChanged(String iface, boolean up) { }
 
+        public void interfaceClassDataActivityChanged(String label, boolean active) { }
+
 	public void interfaceAdded(String iface) {
 	    if(iface.equals(CLAT_INTERFACE_NAME)) {
 		mNat464xlatStateMachine.sendMessage(

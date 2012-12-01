@@ -542,7 +542,7 @@ public class ConnectivityService extends IConnectivityManager.Stub {
         mVpn = new Vpn(mContext, mVpnCallback, mNetd);
         mVpn.startMonitoring(mContext, mTrackerHandler);
 
-	mNat464xlatService = new Nat464xlatService(mContext, nmService, this);
+	mNat464xlatService = new Nat464xlatService(mContext, mNetd, this);
 
         try {
             mNetd.registerObserver(mTethering);
