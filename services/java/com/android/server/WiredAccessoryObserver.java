@@ -53,13 +53,13 @@ class WiredAccessoryObserver extends UEventObserver {
                                                    BIT_USB_HEADSET_ANLG|BIT_USB_HEADSET_DGTL|
                                                    BIT_HDMI_AUDIO);
     private static final int HEADSETS_WITH_MIC = BIT_HEADSET;
+    private static List<String> sDockNames=Arrays.asList(Resources.getSystem().getStringArray(com.android.internal.R.array.config_accessoryDockNames));
 
     private static class UEventInfo {
         private final String mDevName;
         private final int mState1Bits;
         private final int mState2Bits;
         private int switchState;
-        private String mDockNames[]=Resources.getSystem().getStringArray(com.android.internal.R.array.config_accessoryDockNames);
 
         public UEventInfo(String devName, int state1Bits, int state2Bits) {
             mDevName = devName;
@@ -89,7 +89,7 @@ class WiredAccessoryObserver extends UEventObserver {
             switchState = ((mHeadsetState & (BIT_HEADSET|BIT_HEADSET_NO_MIC|BIT_HDMI_AUDIO)) |
                            ((state == 1) ? BIT_USB_HEADSET_ANLG :
                                          ((state == 2) ? BIT_USB_HEADSET_DGTL : 0)));
-        } else if (Arrays.asList(mDockNames).contains(name)) {
+        } else if (sDockNames.contains(name)) {
              switchState = ((mHeadsetState & (BIT_HEADSET|BIT_HEADSET_NO_MIC|BIT_HDMI_AUDIO)) |
                            ((state == 2 || state == 1) ? BIT_USB_HEADSET_ANLG : 0));
             // This sets the switchsate to 4 (for USB HEADSET - BIT_USB_HEADSET_ANLG)
@@ -234,20 +234,20 @@ class WiredAccessoryObserver extends UEventObserver {
     public void onUEvent(UEventObserver.UEvent event) {
         if (LOG) Slog.v(TAG, "Headset UEVENT: " + event.toString());
 
+        int state = Integer.parseInt(event.get("SWITCH_STATE"));
         try {
             String devPath = event.get("DEVPATH");
             String name = event.get("SWITCH_NAME");
-            if (name.equals("dock")) {
+            if (sDockNames.contains(name)) {
                 // Samsung USB Audio Jack is non-sensing - so must be enabled manually
                 // The choice is made in the GalaxyS2Settings.apk
                 // device/samsung/i9100/DeviceSettings/src/com/cyanogenmod/settings/device/DockFragmentActivity.java
                 // This sends an Intent to this class
-                if (!dockAudioEnabled) {
+                if ((!dockAudioEnabled) && (state > 0)) {
                     Slog.e(TAG, "Ignoring dock event as Audio routing disabled " + event);
                     return;
                 }
             }
-            int state = Integer.parseInt(event.get("SWITCH_STATE"));
             updateState(devPath, name, state);
         } catch (NumberFormatException e) {
             Slog.e(TAG, "Could not parse switch state from event " + event);

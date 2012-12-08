@@ -14,6 +14,7 @@
     <uses-permission android:name="android.permission.STATUS_BAR" />
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
     <uses-permission android:name="android.permission.REMOTE_AUDIO_PLAYBACK" />
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
     <!-- Networking and telephony -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
@@ -93,26 +94,6 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
-
-        <!-- should you need to launch the screensaver, this is a good way to do it -->
-        <activity android:name=".DreamsDockLauncher"
-                android:theme="@android:style/Theme.Dialog"
-                android:label="@string/dreams_dock_launcher">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </activity>
-
-        <!-- launch screensaver on (desk) dock event -->
-        <receiver android:name=".DreamsDockLauncher$DockEventReceiver" 
-            android:exported="true"
-            >
-            <intent-filter>
-                <action android:name="android.intent.action.DOCK_EVENT" />
-            </intent-filter>
-        </receiver>
-
 
         <activity android:name=".usb.UsbStorageActivity"
                   android:label="@*android:string/usb_storage_activity_title"

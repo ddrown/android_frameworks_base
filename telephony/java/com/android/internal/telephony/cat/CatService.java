@@ -104,7 +104,7 @@ public class CatService extends Handler implements AppInterface {
     private static final int DEV_ID_TERMINAL    = 0x82;
     private static final int DEV_ID_NETWORK     = 0x83;
 
-    static final String STK_DEFAULT = "Defualt Message";
+    static final String STK_DEFAULT = "Default Message";
 
     // Sms send result constants.
     static final int SMS_SEND_OK = 0;
@@ -186,8 +186,11 @@ public class CatService extends Handler implements AppInterface {
             } catch (ClassCastException e) {
                 // for error handling : cast exception
                 CatLog.d(this, "Fail to parse proactive command");
-                sendTerminalResponse(mCurrntCmd.mCmdDet, ResultCode.CMD_DATA_NOT_UNDERSTOOD,
+                // Don't send Terminal Resp if command detail is not available
+                if (mCurrntCmd != null) {
+                    sendTerminalResponse(mCurrntCmd.mCmdDet, ResultCode.CMD_DATA_NOT_UNDERSTOOD,
                                      false, 0x00, null);
+                }
                 break;
             }
             if (cmdParams != null) {

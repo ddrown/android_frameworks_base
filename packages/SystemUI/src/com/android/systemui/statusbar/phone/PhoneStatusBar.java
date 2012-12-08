@@ -210,6 +210,7 @@ public class PhoneStatusBar extends BaseStatusBar {
     private TextView mCarrierLabel;
     private boolean mCarrierLabelVisible = false;
     private int mCarrierLabelHeight;
+    private TextView mEmergencyCallLabel;
 
     // clock
     private boolean mShowClock;
@@ -235,7 +236,6 @@ public class PhoneStatusBar extends BaseStatusBar {
 
     // the tracker view
     int mTrackingPosition; // the position of the top of the tracking view.
-    private boolean mPanelSlightlyVisible;
 
     // the power widget
     PowerWidget mPowerWidget;
@@ -508,14 +508,6 @@ public class PhoneStatusBar extends BaseStatusBar {
         mPile = (NotificationRowLayout)mStatusBarWindow.findViewById(R.id.latestItems);
         mPile.setLayoutTransitionsEnabled(false);
         mPile.setLongPressListener(getNotificationLongClicker());
-        if (SHOW_CARRIER_LABEL) {
-            mPile.setOnSizeChangedListener(new OnSizeChangedListener() {
-                @Override
-                public void onSizeChanged(View view, int w, int h, int oldw, int oldh) {
-                    updateCarrierLabelVisibility(false);
-                }
-            });
-        }
         mExpandedContents = mPile; // was: expanded.findViewById(R.id.notificationLinearLayout);
 
         mClearButton = mStatusBarWindow.findViewById(R.id.clear_all_button);
@@ -615,7 +607,21 @@ public class PhoneStatusBar extends BaseStatusBar {
         mNetworkController.addSignalCluster(signalCluster);
         signalCluster.setNetworkController(mNetworkController);
 
+        mEmergencyCallLabel = (TextView)mStatusBarWindow.findViewById(R.id.emergency_calls_only);
+        if (mEmergencyCallLabel != null) {
+            mNetworkController.addEmergencyLabelView(mEmergencyCallLabel);
+            mEmergencyCallLabel.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+                @Override
+                public void onLayoutChange(View v, int left, int top, int right, int bottom,
+                        int oldLeft, int oldTop, int oldRight, int oldBottom) {
+                    updateCarrierLabelVisibility(false);
+                }});
+        }
+
         if (SHOW_CARRIER_LABEL) {
+            mCarrierLabel = (TextView)mStatusBarWindow.findViewById(R.id.carrier_label);
+            mCarrierLabel.setVisibility(mCarrierLabelVisible ? View.VISIBLE : View.INVISIBLE);
+
             // for mobile devices, we always show mobile connection info here (SPN/PLMN)
             // for other devices, we show whatever network is connected
             if (mNetworkController.hasMobileDataFeature()) {
@@ -623,6 +629,14 @@ public class PhoneStatusBar extends BaseStatusBar {
             } else {
                 mNetworkController.addCombinedLabelView(mCarrierLabel);
             }
+
+            // set up the dynamic hide/show of the label
+            mPile.setOnSizeChangedListener(new OnSizeChangedListener() {
+                @Override
+                public void onSizeChanged(View view, int w, int h, int oldw, int oldh) {
+                    updateCarrierLabelVisibility(false);
+                }
+            });
         }
 
 //        final ImageView wimaxRSSI =
@@ -642,6 +656,9 @@ public class PhoneStatusBar extends BaseStatusBar {
         context.registerReceiver(mBroadcastReceiver, filter);
 
         mPowerWidget.setupWidget();
+
+        mVelocityTracker = VelocityTracker.obtain();
+
         return mStatusBarView;
     }
 
@@ -1087,9 +1104,11 @@ public class PhoneStatusBar extends BaseStatusBar {
             Slog.d(TAG, String.format("pileh=%d scrollh=%d carrierh=%d",
                     mPile.getHeight(), mScrollView.getHeight(), mCarrierLabelHeight));
         }
-        
-        final boolean makeVisible = 
-            mPile.getHeight() < (mScrollView.getHeight() - mCarrierLabelHeight);
+
+        final boolean emergencyCallsShownElsewhere = mEmergencyCallLabel != null;
+        final boolean makeVisible =
+            !(emergencyCallsShownElsewhere && mNetworkController.isEmergencyOnly())
+            && mPile.getHeight() < (mScrollView.getHeight() - mCarrierLabelHeight);
         
         if (force || mCarrierLabelVisible != makeVisible) {
             mCarrierLabelVisible = makeVisible;
@@ -1407,6 +1426,7 @@ public class PhoneStatusBar extends BaseStatusBar {
                     + " mExpandedVisible=" + mExpandedVisible
                     + " mExpanded=" + mExpanded
                     + " mAnimating=" + mAnimating
+                    + " mAnimatingReveal=" + mAnimatingReveal
                     + " mAnimY=" + mAnimY
                     + " mAnimVel=" + mAnimVel
                     + " flags=" + flags);
@@ -1427,7 +1447,7 @@ public class PhoneStatusBar extends BaseStatusBar {
         }
 
         int y;
-        if (mAnimating) {
+        if (mAnimating || mAnimatingReveal) {
             y = (int)mAnimY;
         } else {
             y = getExpandedViewMaxHeight()-1;
@@ -1462,6 +1482,10 @@ public class PhoneStatusBar extends BaseStatusBar {
         if (!mExpandedVisible) {
             return;
         }
+
+        // Ensure the panel is fully collapsed (just in case; bug 6765842)
+        updateExpandedViewPos(0);
+
         mExpandedVisible = false;
         mPile.setLayoutTransitionsEnabled(false);
         if (mNavigationBarView != null)
@@ -1550,8 +1574,7 @@ public class PhoneStatusBar extends BaseStatusBar {
             return;
         mTracking = false;
         setPileLayers(View.LAYER_TYPE_NONE);
-        mVelocityTracker.recycle();
-        mVelocityTracker = null;
+        mVelocityTracker.clear();
         mCloseView.setPressed(false);
     }
 
@@ -1645,7 +1668,7 @@ public class PhoneStatusBar extends BaseStatusBar {
 
         mTracking = true;
         setPileLayers(View.LAYER_TYPE_HARDWARE);
-        mVelocityTracker = VelocityTracker.obtain();
+        mVelocityTracker.clear();
         if (opening) {
             makeExpandedVisible(true);
         } else {
@@ -1755,6 +1778,50 @@ public class PhoneStatusBar extends BaseStatusBar {
         }
     }
 
+    private void brightnessControl(MotionEvent event)
+    {
+        if (mBrightnessControl)
+        {
+            final int action = event.getAction();
+            final int x = (int)event.getRawX();
+            final int y = (int)event.getRawY();
+            if (action == MotionEvent.ACTION_DOWN) {
+                mLinger = 0;
+                mInitialTouchX = x;
+                mInitialTouchY = y;
+                mHandler.removeCallbacks(mLongPressBrightnessChange);
+                if ((y + mViewDelta) < mNotificationPanelMinHeight) {
+                    mHandler.postDelayed(mLongPressBrightnessChange,
+                            BRIGHTNESS_CONTROL_LONG_PRESS_TIMEOUT);
+                }
+            } else if (action == MotionEvent.ACTION_MOVE) {
+                if ((y + mViewDelta) < mNotificationPanelMinHeight) {
+                    mVelocityTracker.computeCurrentVelocity(1000);
+                    float yVel = mVelocityTracker.getYVelocity();
+                    yVel = Math.abs(yVel);
+                    if (yVel < 50.0f) {
+                        if (mLinger > BRIGHTNESS_CONTROL_LINGER_THRESHOLD) {
+                            adjustBrightness(x);
+                        } else {
+                            mLinger++;
+                        }
+                    }
+                    int touchSlop = ViewConfiguration.get(mContext).getScaledTouchSlop();
+                    if (Math.abs(x - mInitialTouchX) > touchSlop ||
+                            Math.abs(y - mInitialTouchY) > touchSlop) {
+                        mHandler.removeCallbacks(mLongPressBrightnessChange);
+                    }
+                } else {
+                    mHandler.removeCallbacks(mLongPressBrightnessChange);
+                }
+            } else if (action == MotionEvent.ACTION_UP
+                    || action == MotionEvent.ACTION_CANCEL) {
+                mHandler.removeCallbacks(mLongPressBrightnessChange);
+                mLinger = 0;
+            }
+        }
+    }
+
     boolean interceptTouchEvent(MotionEvent event) {
         if (SPEW) {
             Slog.d(TAG, "Touch: rawY=" + event.getRawY() + " event=" + event + " mDisabled="
@@ -1768,23 +1835,13 @@ public class PhoneStatusBar extends BaseStatusBar {
             }
         }
 
-        if ((mDisabled & StatusBarManager.DISABLE_EXPAND) != 0) {
-            return false;
-        }
-
         final int action = event.getAction();
         final int statusBarSize = getStatusBarHeight();
         final int hitSize = statusBarSize*2;
         final int x = (int)event.getRawX();
         final int y = (int)event.getRawY();
-        if (action == MotionEvent.ACTION_DOWN) {
-            if (!areLightsOn()) {
-                setLightsOn(true);
-            }
-            mLinger = 0;
-            mInitialTouchX = x;
-            mInitialTouchY = y;
 
+        if (action == MotionEvent.ACTION_DOWN) {
             if (!mExpanded) {
                 mViewDelta = statusBarSize - y;
             } else {
@@ -1794,6 +1851,18 @@ public class PhoneStatusBar extends BaseStatusBar {
                            + mNotificationPanelBackgroundPadding.top
                            + mNotificationPanelBackgroundPadding.bottom
                            - y;
+            }
+        }
+
+        brightnessControl(event);
+
+        if ((mDisabled & StatusBarManager.DISABLE_EXPAND) != 0) {
+            return false;
+        }
+
+        if (action == MotionEvent.ACTION_DOWN) {
+            if (!areLightsOn()) {
+                setLightsOn(true);
             }
             if ((!mExpanded && y < hitSize) ||
                     // @@ add taps outside the panel if it's not full-screen
@@ -1808,41 +1877,15 @@ public class PhoneStatusBar extends BaseStatusBar {
                     trackMovement(event);
                 }
             }
-            if (mTracking && mBrightnessControl) {
-                mHandler.removeCallbacks(mLongPressBrightnessChange);
-                mHandler.postDelayed(mLongPressBrightnessChange,
-                        BRIGHTNESS_CONTROL_LONG_PRESS_TIMEOUT);
-            }
         } else if (mTracking) {
             trackMovement(event);
             if (action == MotionEvent.ACTION_MOVE) {
-                if (mAnimatingReveal && (y + mViewDelta) < mNotificationPanelMinHeight) {
-                    if (mBrightnessControl) {
-                        mVelocityTracker.computeCurrentVelocity(1000);
-                        float yVel = mVelocityTracker.getYVelocity();
-                        yVel = Math.abs(yVel);
-                        if (yVel < 50.0f) {
-                            if (mLinger > BRIGHTNESS_CONTROL_LINGER_THRESHOLD) {
-                                adjustBrightness(x);
-                            } else {
-                                mLinger++;
-                            }
-                        }
-                        int touchSlop = ViewConfiguration.get(mContext).getScaledTouchSlop();
-                        if (Math.abs(x - mInitialTouchX) > touchSlop ||
-                                Math.abs(y - mInitialTouchY) > touchSlop) {
-                            mHandler.removeCallbacks(mLongPressBrightnessChange);
-                        }
-                    }
-                } else  {
-                    mHandler.removeCallbacks(mLongPressBrightnessChange);
+                if (!mAnimatingReveal || (y + mViewDelta) >= mNotificationPanelMinHeight) {
                     mAnimatingReveal = false;
                     updateExpandedViewPos(y + mViewDelta);
                 }
             } else if (action == MotionEvent.ACTION_UP
                     || action == MotionEvent.ACTION_CANCEL) {
-                mHandler.removeCallbacks(mLongPressBrightnessChange);
-                mLinger = 0;
                 mVelocityTracker.computeCurrentVelocity(1000);
 
                 float yVel = mVelocityTracker.getYVelocity();
@@ -2287,9 +2330,14 @@ public class PhoneStatusBar extends BaseStatusBar {
     @Override
     protected void updateExpandedViewPos(int expandedPosition) {
         if (SPEW) {
-            Slog.d(TAG, "updateExpandedViewPos before expandedPosition=" + expandedPosition
+            Slog.d(TAG, "updateExpandedViewPos: expandedPosition=" + expandedPosition
                     //+ " mTrackingParams.y=" + ((mTrackingParams == null) ? "?" : mTrackingParams.y)
+                    + " mTracking=" + mTracking
                     + " mTrackingPosition=" + mTrackingPosition
+                    + " mExpandedVisible=" + mExpandedVisible
+                    + " mAnimating=" + mAnimating
+                    + " mAnimatingReveal=" + mAnimatingReveal
+                    + " mClosing=" + mClosing
                     + " gravity=" + mNotificationPanelGravity);
         }
         int panelh = 0;
@@ -2298,6 +2346,7 @@ public class PhoneStatusBar extends BaseStatusBar {
         // If the expanded view is not visible, make sure they're still off screen.
         // Maybe the view was resized.
         if (!mExpandedVisible) {
+            if (SPEW) Slog.d(TAG, "updateExpandedViewPos: view not visible, bailing");
             updateExpandedInvisiblePosition();
             return;
         }
@@ -2319,13 +2368,21 @@ public class PhoneStatusBar extends BaseStatusBar {
         }
 
         // catch orientation changes and other peculiar cases
-        if (panelh > disph || (panelh < disph && !mTracking && !mAnimating)) {
+        if (panelh > 0 &&
+                ((panelh > disph) ||
+                 (panelh < disph && !mTracking && !mAnimating))) {
+            if (SPEW) Slog.d(TAG, "updateExpandedViewPos: orientation change?");
             panelh = disph;
         } else if (panelh < 0) {
             panelh = 0;
         }
 
-        if (panelh == mTrackingPosition) return;
+        if (SPEW) Slog.d(TAG, "updateExpandedViewPos: adjusting size to panelh=" + panelh);
+
+        if (panelh == mTrackingPosition) {
+            if (SPEW) Slog.d(TAG, "updateExpandedViewPos: panelh == mTrackingPosition, bailing");
+            return;
+        }
 
         mTrackingPosition = panelh;
 
@@ -2485,8 +2542,7 @@ public class PhoneStatusBar extends BaseStatusBar {
     private BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
-            if (Intent.ACTION_CLOSE_SYSTEM_DIALOGS.equals(action)
-                    || Intent.ACTION_SCREEN_OFF.equals(action)) {
+            if (Intent.ACTION_CLOSE_SYSTEM_DIALOGS.equals(action)) {
                 int flags = CommandQueue.FLAG_EXCLUDE_NONE;
                 if (Intent.ACTION_CLOSE_SYSTEM_DIALOGS.equals(action)) {
                     String reason = intent.getStringExtra("reason");
@@ -2495,6 +2551,10 @@ public class PhoneStatusBar extends BaseStatusBar {
                     }
                 }
                 animateCollapse(flags);
+            }
+            else if (Intent.ACTION_SCREEN_OFF.equals(action)) {
+                // no waiting!
+                performCollapse();
             }
             else if (Intent.ACTION_CONFIGURATION_CHANGED.equals(action)) {
                 updateResources();

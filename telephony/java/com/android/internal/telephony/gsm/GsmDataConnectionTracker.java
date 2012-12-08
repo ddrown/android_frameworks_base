@@ -757,8 +757,7 @@ public final class GsmDataConnectionTracker extends DataConnectionTracker {
 
         boolean desiredPowerState = mPhone.getServiceStateTracker().getDesiredPowerState();
 
-        if ((apnContext.getState() == State.IDLE || apnContext.getState() == State.SCANNING) &&
-                isDataAllowed(apnContext) && getAnyDataEnabled() && !isEmergency()) {
+        if (canSetupData(apnContext)) {
 
             if (apnContext.getState() == State.IDLE) {
                 ArrayList<ApnSetting> waitingApns = buildWaitingApns(apnContext.getApnType());
@@ -791,6 +790,41 @@ public final class GsmDataConnectionTracker extends DataConnectionTracker {
             notifyOffApnsOfAvailability(apnContext.getReason());
             return false;
         }
+    }
+
+    /**
+    * Report on whether data connectivity can be setup for any APN.
+    * @param apnContext The apnContext
+    * @return boolean
+    */
+    private boolean canSetupData(ApnContext apnContext) {
+        if (apnContext.getState() != State.IDLE && apnContext.getState() != State.SCANNING) {
+            return false;
+        }
+
+        if (isDataAllowed(apnContext) && getAnyDataEnabled() && !isEmergency()) {
+            return true;
+        }
+
+        // Get the MMS retrieval settings. Defaults to enabled with roaming disabled
+        final ContentResolver resolver = mPhone.getContext().getContentResolver();
+        boolean mmsAutoRetrieval = Settings.System.getInt(resolver,
+                Settings.System.MMS_AUTO_RETRIEVAL, 1) == 1;
+        boolean mmsRetrievalRoaming = Settings.System.getInt(resolver,
+                Settings.System.MMS_AUTO_RETRIEVAL_ON_ROAMING, 0) == 1;
+
+        // Allow automatic Mms connections if user has enabled it
+        if (mmsAutoRetrieval && apnContext.getApnType().equals(Phone.APN_TYPE_MMS)) {
+            // don't allow MMS connections while roaming if disabled
+            TelephonyManager tm = (TelephonyManager)
+                    mPhone.getContext().getSystemService(Context.TELEPHONY_SERVICE);
+            if (tm.isNetworkRoaming() && !mmsRetrievalRoaming) {
+                return false;
+            }
+            return true;
+        }
+
+        return false;
     }
 
     @Override
@@ -1005,9 +1039,23 @@ public final class GsmDataConnectionTracker extends DataConnectionTracker {
     }
 
     private boolean dataConnectionNotInUse(DataConnectionAc dcac) {
+        if (DBG) log("dataConnectionNotInUse: check if dcac is inuse dc=" + dcac.dataConnection);
         for (ApnContext apnContext : mApnContexts.values()) {
-            if (apnContext.getDataConnectionAc() == dcac) return false;
+            if (apnContext.getDataConnectionAc() == dcac) {
+                if (DBG) log("dataConnectionNotInUse: in use by apnContext=" + apnContext);
+                return false;
+            }
         }
+        // TODO: Fix retry handling so free DataConnections have empty apnlists.
+        // Probably move retry handling into DataConnections and reduce complexity
+        // of DCT.
+        for (ApnContext apnContext : dcac.getApnListSync()) {
+            if (DBG) {
+                log("dataConnectionNotInUse: removing apnContext=" + apnContext);
+            }
+            dcac.removeApnContextSync(apnContext);
+        }
+        if (DBG) log("dataConnectionNotInUse: not in use return true");
         return true;
     }
 
@@ -2198,14 +2246,14 @@ public final class GsmDataConnectionTracker extends DataConnectionTracker {
     protected void onDisconnectDone(int connId, AsyncResult ar) {
         ApnContext apnContext = null;
 
-        if(DBG) log("onDisconnectDone: EVENT_DISCONNECT_DONE connId=" + connId);
         if (ar.userObj instanceof ApnContext) {
             apnContext = (ApnContext) ar.userObj;
         } else {
-            loge("Invalid ar in onDisconnectDone");
+            loge("onDisconnectDone: Invalid ar in onDisconnectDone, ignore");
             return;
         }
 
+        if(DBG) log("onDisconnectDone: EVENT_DISCONNECT_DONE apnContext=" + apnContext);
         apnContext.setState(State.IDLE);
 
         mPhone.notifyDataConnection(apnContext.getReason(), apnContext.getApnType());
@@ -2480,7 +2528,7 @@ public final class GsmDataConnectionTracker extends DataConnectionTracker {
                         + mPreferredApn.numeric + ":" + mPreferredApn);
                 }
                 if ((mPreferredApn.numeric.equals(operator) && mPreferredApn.canHandleType(requestedApnType)) &&
-                    (mPreferredApn.bearer == 0 || mPreferredApn.bearer == radioTech) && 
+                    (mPreferredApn.bearer == 0 || mPreferredApn.bearer == radioTech) &&
                     !apnList.contains(mPreferredApn))
                 {
                     apnList.add(mPreferredApn);

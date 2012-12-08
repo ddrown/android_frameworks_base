@@ -289,7 +289,7 @@ public class StorageManager
      * Constructs a StorageManager object through which an application can
      * can communicate with the systems mount service.
      * 
-     * @param tgtLooper The {@android.os.Looper} which events will be received on.
+     * @param tgtLooper The {@link android.os.Looper} which events will be received on.
      *
      * <p>Applications can get instance of this class by calling
      * {@link android.content.Context#getSystemService(java.lang.String)} with an argument
@@ -417,6 +417,24 @@ public class StorageManager
             return mMountService.isUsbMassStorageEnabled();
         } catch (RemoteException rex) {
             Log.e(TAG, "Failed to get UMS enable state", rex);
+        }
+        return false;
+    }
+
+    /**
+     * Query if a USB Mass Storage (UMS) is supported on the device.
+     * @return true if UMS is supported.
+     *
+     * @hide
+     */
+    public boolean isUsbMassStorageSupported() {
+        // TODO: Maybe query mMountService instead?
+        StorageVolume[] volumes = getVolumeList();
+        if (volumes == null) return false;
+        for (int i = 0; i < volumes.length; i++) {
+            if (volumes[i].allowMassStorage()) {
+                return true;
+            }
         }
         return false;
     }

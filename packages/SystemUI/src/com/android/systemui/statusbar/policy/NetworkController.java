@@ -145,6 +145,7 @@ public class NetworkController extends BroadcastReceiver {
     ArrayList<TextView> mCombinedLabelViews = new ArrayList<TextView>();
     ArrayList<TextView> mMobileLabelViews = new ArrayList<TextView>();
     ArrayList<TextView> mWifiLabelViews = new ArrayList<TextView>();
+    ArrayList<TextView> mEmergencyLabelViews = new ArrayList<TextView>();
     ArrayList<SignalCluster> mSignalClusters = new ArrayList<SignalCluster>();
     int mLastPhoneSignalIconId = -1;
     int mLastDataDirectionIconId = -1;
@@ -245,6 +246,10 @@ public class NetworkController extends BroadcastReceiver {
         return mHasMobileDataFeature;
     }
 
+    public boolean isEmergencyOnly() {
+        return (mServiceState != null && mServiceState.isEmergencyOnly());
+    }
+
     public void addPhoneSignalIconView(ImageView v) {
         mPhoneSignalIconViews.add(v);
     }
@@ -282,6 +287,10 @@ public class NetworkController extends BroadcastReceiver {
 
     public void addWifiLabelView(TextView v) {
         mWifiLabelViews.add(v);
+    }
+
+    public void addEmergencyLabelView(TextView v) {
+        mEmergencyLabelViews.add(v);
     }
 
     public void addSignalCluster(SignalCluster cluster) {
@@ -927,10 +936,12 @@ public class NetworkController extends BroadcastReceiver {
         int combinedSignalIconId = 0;
         int combinedActivityIconId = 0;
         String combinedLabel = "";
+        // Note: the real purpose of "wifiLabel" is to display the connectivity status of
+        // everything (wifi, bluetooth, ethernet) except mobile
         String wifiLabel = "";
         String mobileLabel = "";
         int N;
-        final boolean emergencyOnly = (mServiceState != null && mServiceState.isEmergencyOnly());
+        final boolean emergencyOnly = isEmergencyOnly();
 
         if (!mHasMobileDataFeature) {
             mDataSignalIconId = mPhoneSignalIconId = 0;
@@ -1024,7 +1035,7 @@ public class NetworkController extends BroadcastReceiver {
         }
 
         if (mBluetoothTethered) {
-            combinedLabel = mContext.getString(R.string.bluetooth_tethered);
+            combinedLabel = wifiLabel = mContext.getString(R.string.bluetooth_tethered);
             combinedSignalIconId = mBluetoothTetherIconId;
             mContentDescriptionCombinedSignal = mContext.getString(
                     R.string.accessibility_bluetooth_tether);
@@ -1033,7 +1044,7 @@ public class NetworkController extends BroadcastReceiver {
         final boolean ethernetConnected = (mConnectedNetworkType == ConnectivityManager.TYPE_ETHERNET);
         if (ethernetConnected) {
             // TODO: icons and strings for Ethernet connectivity
-            combinedLabel = mConnectedNetworkTypeName;
+            combinedLabel = wifiLabel = mConnectedNetworkTypeName;
         }
 
         if (mAirplaneMode &&
@@ -1046,8 +1057,8 @@ public class NetworkController extends BroadcastReceiver {
             mAirplaneIconId = R.drawable.stat_sys_signal_flightmode;
             mPhoneSignalIconId = mDataSignalIconId = mDataTypeIconId = 0;
 
-            // combined values from connected wifi take precedence over airplane mode
-            if (mWifiConnected) {
+            // combined values from connected networks take precedence over airplane mode
+            if (mWifiConnected || mBluetoothTethered || ethernetConnected) {
                 // Suppress "No internet connection." from mobile if wifi connected.
                 mobileLabel = "";
             } else {
@@ -1094,6 +1105,7 @@ public class NetworkController extends BroadcastReceiver {
                     + " combinedActivityIconId=0x" + Integer.toHexString(combinedActivityIconId)
                     + " mobileLabel=" + mobileLabel
                     + " wifiLabel=" + wifiLabel
+                    + " emergencyOnly=" + emergencyOnly
                     + " combinedLabel=" + combinedLabel
                     + " mAirplaneMode=" + mAirplaneMode
                     + " mDataActivity=" + mDataActivity
@@ -1256,6 +1268,18 @@ public class NetworkController extends BroadcastReceiver {
             if ("".equals(mobileLabel)) {
                 v.setVisibility(View.GONE);
             } else {
+                v.setVisibility(View.VISIBLE);
+            }
+        }
+
+        // e-call label
+        N = mEmergencyLabelViews.size();
+        for (int i=0; i<N; i++) {
+            TextView v = mEmergencyLabelViews.get(i);
+            if (!emergencyOnly) {
+                v.setVisibility(View.GONE);
+            } else {
+                v.setText(mobileLabel); // comes from the telephony stack
                 v.setVisibility(View.VISIBLE);
             }
         }
